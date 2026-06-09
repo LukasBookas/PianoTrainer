@@ -1,5 +1,5 @@
 """
-Auswahl des MIDI-Eingangs (z.B. das angeschlossene Keyboard).
+MIDI input selection (e.g. the connected keyboard).
 """
 
 import sys
@@ -8,11 +8,7 @@ import mido
 
 
 def select_input_port() -> str:
-    """
-    Gibt den Namen eines MIDI-Eingangs zurueck.
-    Ist nur ein Geraet vorhanden (typisch auf dem Raspberry Pi), wird es
-    automatisch gewaehlt. Bei mehreren wird per Nummer abgefragt.
-    """
+    """Returns a MIDI input name. Auto-picks if only one device exists, else asks."""
     eingaenge = mido.get_input_names()
 
     if not eingaenge:

@@ -1,21 +1,21 @@
 """
-Laedt eine MIDI-Datei und zerlegt sie in Schritte.
+Loads a MIDI file and splits it into steps.
 
-Ein Schritt ist ein sortiertes Set von MIDI-Notennummern, die zur gleichen Zeit
-(gleicher Offset) beginnen -> also entweder eine Einzelnote oder ein Akkord.
+A step is a sorted set of MIDI note numbers that start at the same offset --
+i.e. either a single note or a chord.
 """
 
 from music21 import converter, chord, note as m21note
 
 
 def load_steps(midi_path: str) -> list[list[int]]:
-    """Parst die MIDI-Datei und gibt die geordnete Liste der Schritte zurueck."""
+    """Parses the MIDI file and returns the ordered list of steps."""
     stueck = converter.parse(midi_path)
 
-    # Alle Parts (beide Haende usw.) zusammenfuehren und nach Startzeit gruppieren.
+    # Merge all parts (both hands etc.) and group notes by start time.
     nach_offset: dict[float, set[int]] = {}
     for element in stueck.flatten().notes:
-        offset = round(float(element.offset), 4)  # Startzeit in Viertelnoten
+        offset = round(float(element.offset), 4)
         gruppe = nach_offset.setdefault(offset, set())
         if isinstance(element, chord.Chord):
             for p in element.pitches:
@@ -23,5 +23,4 @@ def load_steps(midi_path: str) -> list[list[int]]:
         elif isinstance(element, m21note.Note):
             gruppe.add(element.pitch.midi)
 
-    # Nach Zeit sortieren -> Reihenfolge der Schritte.
     return [sorted(nach_offset[o]) for o in sorted(nach_offset)]

@@ -1,26 +1,19 @@
 """
-Zentrale Einstellungen fuer den Klavier-Trainer.
+Central settings for the piano trainer.
 """
 
 import os
 
-# Ordner mit den MIDI-Songs.
-#   - Lokal zum Testen z.B. "./songs"
-#   - Auf dem Raspberry Pi der USB-Stick, typischerweise etwas wie
-#     "/media/pi/USBSTICK" oder "/mnt/usb".
-# Per Umgebungsvariable ueberschreibbar, ohne den Code zu aendern:
-#   PIANO_SONGS_DIR=/mnt/usb python main.py
+# Folder containing the MIDI songs (e.g. "./songs", or a USB stick on the Pi
+# like "/media/pi/USBSTICK"). Override with PIANO_SONGS_DIR.
 SONGS_DIR = os.environ.get("PIANO_SONGS_DIR", "./songs")
 
-# Welche Dateiendungen als Songs gelten.
+# File extensions treated as songs.
 MIDI_EXTENSIONS = (".mid", ".midi")
 
-# --- Arduino / LED-Ausgabe ---
-# Serieller Port des Arduino:
-#   None  -> automatisch suchen (empfohlen; findet PC-COM-Port wie auch /dev/ttyUSB0 am Pi)
-#   sonst fest vorgeben, z.B. "COM3" (Windows) oder "/dev/ttyUSB0" (Pi/Linux)
-# Per Umgebungsvariable ueberschreibbar:  PIANO_LED_PORT=/dev/ttyUSB0 python main.py
+# Arduino serial port: None = auto-detect (recommended). Otherwise a fixed port
+# like "COM3" (Windows) or "/dev/ttyUSB0" (Pi/Linux). Override with PIANO_LED_PORT.
 LED_SERIAL_PORT = os.environ.get("PIANO_LED_PORT") or None
 
-# Muss mit der Baudrate im Arduino-Sketch uebereinstimmen.
+# Must match the baud rate in the Arduino sketch.
 LED_BAUD = 115200

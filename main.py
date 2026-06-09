@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """
-Klavier-Trainer -- Einstiegspunkt.
+Piano trainer entry point.
 
-Ablauf:
-  1. Song aus dem Songs-Ordner waehlen (Pfeiltasten; bei nur einem Song direkt).
-  2. Stueck laden und in Schritte zerlegen.
-  3. MIDI-Keyboard waehlen (bei nur einem Geraet automatisch).
-  4. Schritt fuer Schritt durch das Stueck fuehren.
+Flow: pick a song -> load and split it into steps -> pick a MIDI keyboard ->
+walk through the piece step by step.
 
-Aufruf:
-  python main.py                 # nutzt SONGS_DIR aus config.py
-  python main.py /mnt/usb        # Ordner direkt angeben (z.B. USB-Stick am Pi)
+Usage:
+  python main.py                 # uses SONGS_DIR from config.py
+  python main.py /mnt/usb        # pass the songs folder directly (e.g. USB stick on the Pi)
 
-Benoetigt:  pip install -r requirements.txt
-Beenden:    Strg + C
+Requires:  pip install -r requirements.txt
+Quit:      Ctrl + C
 """
 
 import sys

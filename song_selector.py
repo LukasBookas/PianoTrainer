@@ -1,13 +1,9 @@
 """
-Konsolen-Auswahl der Songs mit Pfeiltasten (curses).
+Console song selection with arrow keys (curses).
 
-- Kein Song im Ordner   -> None
-- Genau ein Song        -> wird direkt gewaehlt (keine GUI)
-- Mehrere Songs         -> Auswahlmenue mit Pfeil hoch/runter, Enter = waehlen
-
-Hinweis: curses ist unter Linux/macOS Standard. Unter Windows zusaetzlich
-'windows-curses' installieren (pip install windows-curses). Ist curses nicht
-verfuegbar, faellt die Auswahl automatisch auf ein einfaches Nummern-Menue zurueck.
+No song -> None. Exactly one song -> picked directly. Several -> arrow menu.
+Falls back to a simple numbered menu when curses is unavailable (e.g. Windows
+without 'windows-curses', or output redirected in an IDE).
 """
 
 import os
@@ -16,13 +12,13 @@ import sys
 try:
     import curses
 except ImportError:
-    curses = None  # kein curses -> spaeter Fallback auf Text-Menue
+    curses = None  # no curses -> fall back to the text menu later
 
 from config import MIDI_EXTENSIONS
 
 
 def list_songs(folder: str) -> list[str]:
-    """Liefert die sortierte Liste der MIDI-Dateien im Ordner (volle Pfade)."""
+    """Returns the sorted list of MIDI files in the folder (full paths)."""
     if not os.path.isdir(folder):
         return []
     dateien = [
@@ -34,7 +30,7 @@ def list_songs(folder: str) -> list[str]:
 
 
 def _safe_addstr(win, y, x, text, attr=0) -> None:
-    """addstr, das nicht abstuerzt, wenn der Text ueber den Rand laeuft."""
+    """addstr that won't crash when the text runs past the screen edge."""
     height, width = win.getmaxyx()
     if y >= height:
         return
@@ -45,12 +41,12 @@ def _safe_addstr(win, y, x, text, attr=0) -> None:
 
 
 def _run_menu(stdscr, title: str, options: list[str]):
-    """Zeigt das Menue, gibt den gewaehlten Index zurueck oder None bei Abbruch."""
+    """Shows the menu; returns the chosen index, or None on cancel."""
     curses.curs_set(0)
     stdscr.keypad(True)
 
-    idx = 0   # aktuell markierter Eintrag
-    top = 0   # oberster sichtbarer Eintrag (fuers Scrollen bei langen Listen)
+    idx = 0   # currently highlighted entry
+    top = 0   # topmost visible entry (for scrolling long lists)
 
     while True:
         stdscr.erase()
@@ -58,7 +54,7 @@ def _run_menu(stdscr, title: str, options: list[str]):
         kopf, fuss = 2, 1
         sichtbar = max(1, height - kopf - fuss)
 
-        # Scroll-Fenster so verschieben, dass die Markierung sichtbar bleibt.
+        # Keep the highlighted entry within the visible window.
         if idx < top:
             top = idx
         elif idx >= top + sichtbar:
@@ -82,17 +78,12 @@ def _run_menu(stdscr, title: str, options: list[str]):
             idx = (idx + 1) % len(options)
         elif key in (curses.KEY_ENTER, 10, 13):
             return idx
-        elif key in (27, ord("q")):  # Esc oder q
+        elif key in (27, ord("q")):  # Esc or q
             return None
 
 
 def _curses_usable() -> bool:
-    """
-    True nur, wenn curses vorhanden ist UND ein echtes Terminal vorliegt.
-    In IDE-Ausgabefenstern o.ae. ist die Ausgabe umgeleitet -> dort wuerde
-    curses ("Redirection is not supported.") abstuerzen. Mit PIANO_NO_CURSES
-    laesst sich die Pfeiltasten-Auswahl auch von Hand abschalten.
-    """
+    """True only if curses exists AND we have a real terminal (not redirected)."""
     if curses is None or os.environ.get("PIANO_NO_CURSES"):
         return False
     try:
@@ -102,7 +93,7 @@ def _curses_usable() -> bool:
 
 
 def _text_menu(songs: list[str], namen: list[str]):
-    """Einfaches Nummern-Menue als Fallback, wenn curses nicht verfuegbar ist."""
+    """Simple numbered fallback menu when curses is unavailable."""
     print("Song waehlen:")
     for i, name in enumerate(namen):
         print(f"  [{i}] {name}")
@@ -116,17 +107,13 @@ def _text_menu(songs: list[str], namen: list[str]):
 
 
 def choose_song(folder: str):
-    """
-    Laesst den Nutzer einen Song waehlen.
-    Rueckgabe: voller Pfad zur gewaehlten Datei, oder None
-    (kein Song vorhanden ODER Auswahl abgebrochen).
-    """
+    """Lets the user pick a song. Returns the full path, or None (none found or cancelled)."""
     songs = list_songs(folder)
 
     if not songs:
         return None
     if len(songs) == 1:
-        return songs[0]  # nur ein Lied? -> direkt nehmen
+        return songs[0]
 
     namen = [os.path.basename(s) for s in songs]
 
@@ -135,6 +122,6 @@ def choose_song(folder: str):
             idx = curses.wrapper(_run_menu, "Song waehlen:", namen)
             return None if idx is None else songs[idx]
         except Exception:
-            pass  # bei Problemen sauber auf das Text-Menue zurueckfallen
+            pass  # on any problem, fall back to the text menu
 
     return _text_menu(songs, namen)

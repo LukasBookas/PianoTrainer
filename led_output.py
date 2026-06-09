@@ -1,18 +1,14 @@
 """
-Sendet an den Arduino (LED-Anzeige), welche Noten wie leuchten sollen -- per USB-Serial.
+Sends LED commands to the Arduino over USB serial.
 
-Protokoll (eine Textzeile pro Befehl):
-  T 60 64 67\n   -> diese MIDI-Noten als "zu druecken" anzeigen (Prompt-Farbe);
-                    setzt die vorherige Anzeige komplett zurueck.
-  B 60\n         -> diese (korrekt gedrueckte) Note blau faerben; bleibt blau,
-                    bis der naechste T-Befehl kommt (also solange der Schritt
-                    diese Note verlangt).
-  F 62\n         -> diese (falsch gedrueckte) Note kurz rot aufblitzen lassen.
-  C\n            -> alle LEDs aus.
+Protocol (one text line per command):
+  T 60 64 67   -> show these MIDI notes as "to press" (prompt color); resets the display.
+  B 60         -> mark a correctly pressed note blue (stays until the next T command).
+  F 62         -> briefly flash a wrongly pressed note red.
+  C            -> all LEDs off.
 
-Faellt sauber zurueck: ist kein Arduino verbunden oder pyserial nicht installiert,
-laeuft der Trainer trotzdem normal weiter -- nur eben ohne LED-Ausgabe. So kannst
-du die Logik auch ohne angeschlossene Hardware testen.
+Degrades gracefully: with no Arduino or no pyserial, the trainer keeps running
+without LED output, so the logic can be tested without hardware.
 """
 
 import time
@@ -25,7 +21,7 @@ except ImportError:
 
 
 def _auto_detect_port():
-    """Sucht den ersten plausiblen USB-Serial-Port (Arduino / CH340 / FTDI ...)."""
+    """Finds the first plausible USB-serial port (Arduino / CH340 / FTDI ...)."""
     if serial is None:
         return None
     schluessel = ("arduino", "ch340", "ch9102", "ftdi", "wch",
@@ -38,7 +34,7 @@ def _auto_detect_port():
 
 
 class LedOutput:
-    """Duenne Huelle um die serielle Verbindung zum Arduino."""
+    """Thin wrapper around the serial connection to the Arduino."""
 
     def __init__(self, port=None, baud=115200):
         self._ser = None
@@ -55,14 +51,14 @@ class LedOutput:
 
         try:
             self._ser = serial.Serial(port, baud, timeout=1)
-            time.sleep(2)  # der Arduino macht beim Verbinden einen Reset -> kurz warten
+            time.sleep(2)  # Arduino resets on connect -> wait briefly
             print(f"LED-Ausgabe aktiv ueber {port}.")
         except Exception as e:
             print(f"Hinweis: Port '{port}' nicht nutzbar ({e}) -> ohne LED-Ausgabe.")
             self._ser = None
 
     def _send(self, line: str) -> None:
-        """Schickt eine fertige Befehlszeile an den Arduino (ignoriert Fehler)."""
+        """Sends a ready-made command line to the Arduino (errors ignored)."""
         if not self._ser:
             return
         try:
@@ -71,25 +67,21 @@ class LedOutput:
             pass
 
     def target(self, notes) -> None:
-        """Zeigt die als naechstes zu drueckenden Noten an (Prompt-Farbe, tuerkis).
-
-        Setzt zugleich die vorherige Anzeige (inkl. blauer Noten) komplett zurueck.
-        """
+        """Shows the notes to press next and resets the previous display."""
         self._send("T " + " ".join(str(n) for n in notes) + "\n")
 
-    # Alter Name aus frueheren Versionen -> bleibt nutzbar.
-    light = target
+    light = target  # backwards-compatible alias
 
     def mark_correct(self, note) -> None:
-        """Faerbt eine korrekt gedrueckte Note blau (bleibt bis zum naechsten Schritt)."""
+        """Marks a correctly pressed note blue until the next step."""
         self._send(f"B {note}\n")
 
     def flash_wrong(self, note) -> None:
-        """Laesst eine falsch gedrueckte Note kurz rot aufleuchten."""
+        """Briefly flashes a wrongly pressed note red."""
         self._send(f"F {note}\n")
 
     def clear(self) -> None:
-        """Schaltet alle LEDs aus."""
+        """Turns all LEDs off."""
         self._send("C\n")
 
     def close(self) -> None:

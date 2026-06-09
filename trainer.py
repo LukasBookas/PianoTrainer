@@ -1,20 +1,16 @@
 """
-Der eigentliche Trainer: fuehrt Schritt fuer Schritt durch ein Stueck.
+The trainer core: walks through a piece step by step.
 
-Es wird erst zum naechsten Schritt gewechselt, wenn alle benoetigten Tasten des
-aktuellen Schritts gedrueckt wurden. Tempo und Notenlaengen werden bewusst
-ignoriert -- es geht nur darum, *welche* Tasten als naechstes kommen.
+Advances to the next step only once every required key of the current step has
+been pressed. Tempo and note lengths are intentionally ignored -- only *which*
+keys come next matters.
 
-Gehaltene Toene: Der Trainer merkt sich, welche Tasten du gerade gedrueckt
-haeltst (ueber note_off). Verlangt der naechste Schritt eine Note, die du aus
-dem vorigen Schritt noch haeltst (gemeinsamer Ton / Legato), zaehlt sie sofort
-als gespielt -- du musst sie nicht erst loslassen und neu anschlagen.
+Held notes: keys still held from the previous step (legato / shared tones) count
+as already played without needing to be released and re-struck.
 
-LED-Rueckmeldung (falls ein Arduino angeschlossen ist):
-  - zu drueckende Tasten leuchten tuerkis,
-  - korrekt gedrueckte (auch durchgehaltene) werden blau und bleiben es, bis der
-    Schritt wechselt,
-  - falsch gedrueckte blinken kurz rot.
+LED feedback (if an Arduino is connected): notes to press glow turquoise,
+correctly pressed (incl. held) ones turn blue until the step changes, wrong ones
+flash red briefly.
 """
 
 import mido
@@ -29,14 +25,12 @@ def _zeige_schritt(index: int, gesamt: int, noten: list[int]) -> None:
 
 def _beginne_schritt(index: int, steps: list[list[int]], gehalten: set[int], led):
     """
-    Bereitet einen Schritt vor: zeigt ihn an, leuchtet die Zielnoten tuerkis und
-    uebernimmt bereits gehaltene benoetigte Noten direkt als 'schon gespielt'
-    (diese leuchten sofort blau).
-    Rueckgabe: (benoetigt, korrekt_gespielt) als Mengen.
+    Prepares a step: displays it, lights the target notes, and counts already
+    held required notes as played. Returns (required, correctly_played) as sets.
     """
     _zeige_schritt(index, len(steps), steps[index])
     benoetigt = set(steps[index])
-    korrekt_gespielt = benoetigt & gehalten  # durchgehaltene gemeinsame Toene zaehlen sofort
+    korrekt_gespielt = benoetigt & gehalten  # held shared tones count immediately
     if led:
         led.target(steps[index])
         for n in sorted(korrekt_gespielt):
@@ -46,8 +40,8 @@ def _beginne_schritt(index: int, steps: list[list[int]], gehalten: set[int], led
 
 def run_trainer(steps: list[list[int]], port_name: str, led=None) -> None:
     """
-    Spielt das Stueck Schritt fuer Schritt durch, lauschend auf port_name.
-    led: optionales LedOutput-Objekt fuer die Arduino-Anzeige (None = nur Konsole).
+    Plays the piece step by step, listening on port_name.
+    led: optional LedOutput for the Arduino display (None = console only).
     """
     if not steps:
         print("Keine Noten im Stueck gefunden.")
@@ -58,15 +52,14 @@ def run_trainer(steps: list[list[int]], port_name: str, led=None) -> None:
     with mido.open_input(port_name) as port:
         index = 0
         fehler_gesamt = 0
-        gehalten: set[int] = set()  # aktuell physisch gedrueckte Tasten
+        gehalten: set[int] = set()  # currently physically held keys
 
         benoetigt, korrekt_gespielt = _beginne_schritt(index, steps, gehalten, led)
 
         def _zum_naechsten_schritt() -> bool:
             """
-            Geht zum naechsten Schritt weiter. Schritte, die durch bereits
-            gehaltene Tasten schon vollstaendig erfuellt sind, werden gleich
-            mit uebersprungen. Rueckgabe True, wenn das Stueck fertig ist.
+            Advances to the next step, skipping any that are already fully
+            satisfied by held keys. Returns True when the piece is finished.
             """
             nonlocal index, benoetigt, korrekt_gespielt
             while True:
@@ -78,38 +71,35 @@ def run_trainer(steps: list[list[int]], port_name: str, led=None) -> None:
                     return True
                 benoetigt, korrekt_gespielt = _beginne_schritt(index, steps, gehalten, led)
                 if not benoetigt.issubset(korrekt_gespielt):
-                    return False  # hier wird wieder auf eine Eingabe gewartet
-                # Schritt bereits komplett durchgehalten -> als geschafft melden, weiter
+                    return False
                 print("   (gehalten) ok\n")
 
         for msg in port:
             typ = msg.type
 
-            # Loslassen mitschreiben (note_off oder note_on mit velocity 0),
-            # treibt den Fortschritt aber nicht voran.
+            # Track releases (note_off, or note_on with velocity 0); does not
+            # drive progress.
             if typ == "note_off" or (typ == "note_on" and msg.velocity == 0):
                 gehalten.discard(msg.note)
                 continue
             if typ != "note_on":
-                continue  # andere Nachrichten (Controller, Aftertouch ...) ignorieren
+                continue  # ignore controllers, aftertouch, etc.
 
-            # Ab hier: frischer Tastendruck (note_on, velocity > 0).
+            # From here: a fresh key press (note_on, velocity > 0).
             gehalten.add(msg.note)
 
             if msg.note in benoetigt:
-                # Richtige Taste: blau faerben (nur beim ersten frischen Druck).
                 if msg.note not in korrekt_gespielt:
                     korrekt_gespielt.add(msg.note)
                     if led:
                         led.mark_correct(msg.note)
 
-                # Schritt geschafft, sobald alle benoetigten Noten gedrueckt wurden.
                 if benoetigt.issubset(korrekt_gespielt):
                     print("   ok\n")
                     if _zum_naechsten_schritt():
                         return
             else:
-                # Falsche Taste: kurz rot blinken, Feedback ausgeben, Fortschritt nicht blockieren.
+                # Wrong key: flash red, report, but don't block progress.
                 fehler_gesamt += 1
                 fehlend = sorted(benoetigt - korrekt_gespielt) or sorted(benoetigt)
                 erwartet = " + ".join(note_name(n) for n in fehlend)
