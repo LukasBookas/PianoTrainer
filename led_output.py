@@ -1,9 +1,14 @@
 """
-Sendet die aktuell zu drueckenden Noten an den Arduino (LED-Anzeige) per USB-Serial.
+Sendet an den Arduino (LED-Anzeige), welche Noten wie leuchten sollen -- per USB-Serial.
 
 Protokoll (eine Textzeile pro Befehl):
-  L 60 64 67\n   -> diese MIDI-Noten aufleuchten lassen
-  C\n            -> alle LEDs aus
+  T 60 64 67\n   -> diese MIDI-Noten als "zu druecken" anzeigen (Prompt-Farbe);
+                    setzt die vorherige Anzeige komplett zurueck.
+  B 60\n         -> diese (korrekt gedrueckte) Note blau faerben; bleibt blau,
+                    bis der naechste T-Befehl kommt (also solange der Schritt
+                    diese Note verlangt).
+  F 62\n         -> diese (falsch gedrueckte) Note kurz rot aufblitzen lassen.
+  C\n            -> alle LEDs aus.
 
 Faellt sauber zurueck: ist kein Arduino verbunden oder pyserial nicht installiert,
 laeuft der Trainer trotzdem normal weiter -- nur eben ohne LED-Ausgabe. So kannst
@@ -56,24 +61,36 @@ class LedOutput:
             print(f"Hinweis: Port '{port}' nicht nutzbar ({e}) -> ohne LED-Ausgabe.")
             self._ser = None
 
-    def light(self, notes) -> None:
-        """Laesst genau die angegebenen MIDI-Noten leuchten (vorherige gehen aus)."""
+    def _send(self, line: str) -> None:
+        """Schickt eine fertige Befehlszeile an den Arduino (ignoriert Fehler)."""
         if not self._ser:
             return
-        zeile = "L " + " ".join(str(n) for n in notes) + "\n"
         try:
-            self._ser.write(zeile.encode("ascii"))
+            self._ser.write(line.encode("ascii"))
         except Exception:
             pass
 
+    def target(self, notes) -> None:
+        """Zeigt die als naechstes zu drueckenden Noten an (Prompt-Farbe, tuerkis).
+
+        Setzt zugleich die vorherige Anzeige (inkl. blauer Noten) komplett zurueck.
+        """
+        self._send("T " + " ".join(str(n) for n in notes) + "\n")
+
+    # Alter Name aus frueheren Versionen -> bleibt nutzbar.
+    light = target
+
+    def mark_correct(self, note) -> None:
+        """Faerbt eine korrekt gedrueckte Note blau (bleibt bis zum naechsten Schritt)."""
+        self._send(f"B {note}\n")
+
+    def flash_wrong(self, note) -> None:
+        """Laesst eine falsch gedrueckte Note kurz rot aufleuchten."""
+        self._send(f"F {note}\n")
+
     def clear(self) -> None:
         """Schaltet alle LEDs aus."""
-        if not self._ser:
-            return
-        try:
-            self._ser.write(b"C\n")
-        except Exception:
-            pass
+        self._send("C\n")
 
     def close(self) -> None:
         if self._ser:
