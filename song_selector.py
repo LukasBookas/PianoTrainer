@@ -6,11 +6,17 @@ Konsolen-Auswahl der Songs mit Pfeiltasten (curses).
 - Mehrere Songs         -> Auswahlmenue mit Pfeil hoch/runter, Enter = waehlen
 
 Hinweis: curses ist unter Linux/macOS Standard. Unter Windows zusaetzlich
-'windows-curses' installieren (pip install windows-curses).
+'windows-curses' installieren (pip install windows-curses). Ist curses nicht
+verfuegbar, faellt die Auswahl automatisch auf ein einfaches Nummern-Menue zurueck.
 """
 
-import curses
 import os
+import sys
+
+try:
+    import curses
+except ImportError:
+    curses = None  # kein curses -> spaeter Fallback auf Text-Menue
 
 from config import MIDI_EXTENSIONS
 
@@ -27,7 +33,7 @@ def list_songs(folder: str) -> list[str]:
     return sorted(dateien)
 
 
-def _safe_addstr(win, y, x, text, attr=curses.A_NORMAL) -> None:
+def _safe_addstr(win, y, x, text, attr=0) -> None:
     """addstr, das nicht abstuerzt, wenn der Text ueber den Rand laeuft."""
     height, width = win.getmaxyx()
     if y >= height:
@@ -80,6 +86,35 @@ def _run_menu(stdscr, title: str, options: list[str]):
             return None
 
 
+def _curses_usable() -> bool:
+    """
+    True nur, wenn curses vorhanden ist UND ein echtes Terminal vorliegt.
+    In IDE-Ausgabefenstern o.ae. ist die Ausgabe umgeleitet -> dort wuerde
+    curses ("Redirection is not supported.") abstuerzen. Mit PIANO_NO_CURSES
+    laesst sich die Pfeiltasten-Auswahl auch von Hand abschalten.
+    """
+    if curses is None or os.environ.get("PIANO_NO_CURSES"):
+        return False
+    try:
+        return sys.stdin.isatty() and sys.stdout.isatty()
+    except Exception:
+        return False
+
+
+def _text_menu(songs: list[str], namen: list[str]):
+    """Einfaches Nummern-Menue als Fallback, wenn curses nicht verfuegbar ist."""
+    print("Song waehlen:")
+    for i, name in enumerate(namen):
+        print(f"  [{i}] {name}")
+    while True:
+        wahl = input("Nummer eingeben (oder q zum Abbrechen): ").strip()
+        if wahl.lower() == "q":
+            return None
+        if wahl.isdigit() and 0 <= int(wahl) < len(songs):
+            return songs[int(wahl)]
+        print("Ungueltige Eingabe.")
+
+
 def choose_song(folder: str):
     """
     Laesst den Nutzer einen Song waehlen.
@@ -91,10 +126,15 @@ def choose_song(folder: str):
     if not songs:
         return None
     if len(songs) == 1:
-        return songs[0]  # nur ein Lied -> direkt nehmen
+        return songs[0]  # nur ein Lied? -> direkt nehmen
 
     namen = [os.path.basename(s) for s in songs]
-    idx = curses.wrapper(_run_menu, "Song waehlen:", namen)
-    if idx is None:
-        return None
-    return songs[idx]
+
+    if _curses_usable():
+        try:
+            idx = curses.wrapper(_run_menu, "Song waehlen:", namen)
+            return None if idx is None else songs[idx]
+        except Exception:
+            pass  # bei Problemen sauber auf das Text-Menue zurueckfallen
+
+    return _text_menu(songs, namen)
