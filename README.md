@@ -5,16 +5,14 @@ Ein interaktiver Trainings-System für Klavier basierend auf Arduino Nano mit vi
 ## 🎯 Features
 
 - **Ereignis-gesteuerte Zustandsmaschine** – Keine Takt-abhängigkeit, flexibles Tempo
-- **4-Zustands-System pro Note:**
-  - 🔘 **PENDING** – Noch nicht dran (LED aus)
-  - 🔵 **ARMED** – Jetzt drücken (hell türkis)
-  - 🔵 **HOLDING** – Weitermachen halten (dunkelblau)
-  - ✅ **DONE** – Fertig, darfst loslassen (LED aus)
+  - 🔵 **Hellblau** – Jetzt drücken
+  - 🟣 **Dunkelblau** – Halten
+  - 🔘 **LED aus** – Loslassen
 
-- **Intelligente Haltedauer-Kontrolle:**
+- **Haltedauer-Kontrolle:**
   - Jede Note hat eine konfigurierbare Mindest-Haltedauer
   - Zu früh losgelassen? → Rote LED + Note wird neu angefordert
-  - Länger halten als nötig? → Egal, wird ignoriert
+  - Länger halten als nötig? → Egal, kannst dir Zeit lassen beim spielen kein Stress undso
 
 - **Akkord-Unterstützung** – Mehrere Noten gleichzeitig möglich
 - **Überlappende Noten** – Der Spielkopf rückt nur weiter, wenn Du alle fälligen Noten drückst
