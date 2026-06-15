@@ -1,4 +1,0 @@
-mido
-python-rtmidi
-music21
-pyserial
